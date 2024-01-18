@@ -1016,6 +1016,10 @@ static int __tcp_transmit_skb(struct sock *sk, struct sk_buff *skb,
 			skb = skb_clone(skb, gfp_mask);
 		if (unlikely(!skb))
 			return -ENOBUFS;
+		/* retransmit skbs might have a non zero value in skb->dev
+		 * because skb->dev is aliased with skb->rbnode.rb_left
+		 */
+		skb->dev = NULL;
 	}
 	skb->skb_mstamp = tp->tcp_mstamp;
 
@@ -2201,8 +2205,16 @@ static bool tcp_small_queue_check(struct sock *sk, const struct sk_buff *skb,
 	unsigned int limit;
 
 	limit = max(2 * skb->truesize, sk->sk_pacing_rate >> 10);
-	limit = min_t(u32, limit, sysctl_tcp_limit_output_bytes);
-	limit <<= factor;
+	if (factor > 0) {
+		limit = min_t(u32, limit, sysctl_tcp_limit_output_bytes);
+		limit <<= factor;
+	} else {
+		/* FIXME: P170118-06256/P171122-01021/P171122-00262
+		 * Disable TSQ to avoid TSQ full and UL TP degression in
+		 * bad network condition
+		 */
+		limit = max_t(u32, limit, 4194304);
+	}
 
 	if (refcount_read(&sk->sk_wmem_alloc) > limit) {
 		/* Always send the 1st or 2nd skb in write queue.
