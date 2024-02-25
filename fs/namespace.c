@@ -2135,6 +2135,45 @@ static inline bool may_mandlock(void)
 	return capable(CAP_SYS_ADMIN);
 }
 
+static int can_umount(const struct path *path, int flags)
+{
+	struct mount *mnt = real_mount(path->mnt);
+
+	if (!may_mount())
+		return -EPERM;
+	if (path->dentry != path->mnt->mnt_root)
+		return -EINVAL;
+	if (!check_mnt(mnt))
+		return -EINVAL;
+#ifdef CONFIG_KDP_NS
+	if (((struct kdp_mount *)mnt)->mnt->mnt_flags & MNT_LOCKED)
+#else
+	if (mnt->mnt.mnt_flags & MNT_LOCKED) /* Check optimistically */
+#endif
+		return -EINVAL;
+	if (flags & MNT_FORCE && !capable(CAP_SYS_ADMIN))
+		return -EPERM;
+	return 0;
+}
+
+// caller is responsible for flags being sane
+int path_umount(struct path *path, int flags)
+{
+	struct mount *mnt = real_mount(path->mnt);
+	int ret;
+
+	ret = can_umount(path, flags);
+	if (!ret)
+		ret = do_umount(mnt, flags);
+
+	/* we mustn't call path_put() as that would clear mnt_expiry_mark */
+	dput(path->dentry);
+	mntput_no_expire(mnt);
+	if (!ret)
+		sys_umount_trace_print(mnt, flags);
+	return ret;
+}
+
 /*
  * Now umount can handle mount points as well as block devices.
  * This is important for filesystems which use unnamed block devices.
