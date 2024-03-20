@@ -49,7 +49,3 @@ obj-$(CONFIG_PROCA)			+= proca/
 # GAF module for PROCA, Secure Storage 1
 subdir-$(CONFIG_GAF) += proca/gaf
 obj-$(CONFIG_GAF)    += proca/gaf/
-
-# Knox SDP
-obj-$(CONFIG_SDP) += sdp/
-obj-$(CONFIG_SDP) += sdp/built-in.o
