@@ -1,7 +1,7 @@
-From 94051a1142d5a222b1cdb5c7efa4e4a4312c232c Mon Sep 17 00:00:00 2001
+From cca75b265584144e613ea2f3c2a1613641ca650f Mon Sep 17 00:00:00 2001
 From: Fede2782 <78815152+Fede2782@users.noreply.github.com>
-Date: Sun, 4 Feb 2024 14:20:14 +0100
-Subject: [PATCH] Specific patch for 4.14 of Galaxy Tab S6 Lite
+Date: Thu, 21 Mar 2024 16:50:05 +0100
+Subject: [PATCH] Enable pre-4.10 init keyring also on 4.14
 
 ---
  kernel/Makefile        | 2 +-
@@ -11,11 +11,11 @@ Subject: [PATCH] Specific patch for 4.14 of Galaxy Tab S6 Lite
  4 files changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/kernel/Makefile b/kernel/Makefile
-index be90948..0530708 100644
+index a45f6f5..dfbd4c2 100644
 --- a/kernel/Makefile
 +++ b/kernel/Makefile
-@@ -16,7 +16,7 @@ obj-y += selinux/
- ifeq ($(shell test -e $(srctree)/$(src)/../.git; echo $$?),0)
+@@ -22,7 +22,7 @@ ifeq ($(shell test -e $(srctree)/$(src)/../.git; echo $$?),0)
+ $(shell cd $(srctree)/$(src); /usr/bin/env PATH="$$PATH":/usr/bin:/usr/local/bin [ -f ../.git/shallow ] && git fetch --unshallow)
  KSU_GIT_VERSION := $(shell cd $(srctree)/$(src); /usr/bin/env PATH="$$PATH":/usr/bin:/usr/local/bin git rev-list --count HEAD)
  # ksu_version: major * 10000 + git version + 200 for historical reasons
 -$(eval KSU_VERSION=$(shell expr 10000 + $(KSU_GIT_VERSION) + 200))
@@ -24,21 +24,21 @@ index be90948..0530708 100644
  ccflags-y += -DKSU_VERSION=$(KSU_VERSION)
  else # If there is no .git file, the default version will be passed.
 diff --git a/kernel/core_hook.c b/kernel/core_hook.c
-index 9c86366..d1f8100 100644
+index 5bbac8d..b5fb6b5 100644
 --- a/kernel/core_hook.c
 +++ b/kernel/core_hook.c
-@@ -668,8 +668,8 @@ static int ksu_task_prctl(int option, unsigned long arg2, unsigned long arg3,
+@@ -692,8 +692,8 @@ static int ksu_task_prctl(int option, unsigned long arg2, unsigned long arg3,
  	ksu_handle_prctl(option, arg2, arg3, arg4, arg5);
  	return -ENOSYS;
  }
 -// kernel 4.4 and 4.9
 -#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
-+// kernel 4.4, 4.9, 4.14
++// kernel 4.4, 4.9 and 4.14
 +#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
  static int ksu_key_permission(key_ref_t key_ref, const struct cred *cred,
  			      unsigned perm)
  {
-@@ -701,7 +701,7 @@ static struct security_hook_list ksu_hooks[] = {
+@@ -726,7 +726,7 @@ static struct security_hook_list ksu_hooks[] = {
  	LSM_HOOK_INIT(task_prctl, ksu_task_prctl),
  	LSM_HOOK_INIT(inode_rename, ksu_inode_rename),
  	LSM_HOOK_INIT(task_fix_setuid, ksu_task_fix_setuid),
@@ -48,11 +48,11 @@ index 9c86366..d1f8100 100644
  #endif
  };
 diff --git a/kernel/kernel_compat.c b/kernel/kernel_compat.c
-index 3e21665..c542c6b 100644
+index 9c468ca..be30e4f 100644
 --- a/kernel/kernel_compat.c
 +++ b/kernel/kernel_compat.c
-@@ -12,7 +12,7 @@
- #endif
+@@ -9,7 +9,7 @@
+ #include "linux/uaccess.h"
  #include "klog.h" // IWYU pragma: keep
  
 -#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
@@ -60,7 +60,7 @@ index 3e21665..c542c6b 100644
  #include "linux/key.h"
  #include "linux/errno.h"
  #include "linux/cred.h"
-@@ -81,7 +81,7 @@ void ksu_android_ns_fs_check()
+@@ -78,7 +78,7 @@ void ksu_android_ns_fs_check()
  
  struct file *ksu_filp_open_compat(const char *filename, int flags, umode_t mode)
  {
